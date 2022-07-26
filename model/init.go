@@ -1,28 +1,29 @@
 package model
 
 import (
-	"github.com/go-redis/redis"
 	utils "gollow/utils"
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 	"log"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/go-redis/redis"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 var DB *gorm.DB
 var RedisClient *redis.Client
 
-func Database(connectString string){
+func Database(connectString string) {
 	newLogger := logger.New(
 		log.New(os.Stdout, "\r\n", log.LstdFlags),
 		logger.Config{
-			SlowThreshold: 				time.Second,
-			LogLevel: 					logger.Info,
-			IgnoreRecordNotFoundError: 	true,
-			Colorful: 					false,
+			SlowThreshold:             time.Second,
+			LogLevel:                  logger.Info,
+			IgnoreRecordNotFoundError: true,
+			Colorful:                  false,
 		},
 	)
 
@@ -46,19 +47,19 @@ func Database(connectString string){
 	DB = db
 
 	// 开始自动迁移模式
-	migration()
+	go migration()
 }
 
-func Redis(){
+func Redis() {
 	db, err := strconv.ParseUint(os.Getenv("REDIS_DB"), 10, 64)
 	if err != nil {
 		utils.Log().Error("redis lost: %v", err)
 		panic(err)
 	}
 	client := redis.NewClient(&redis.Options{
-		Addr: 		os.Getenv("REDIS_ADDR"),
-		Password: 	os.Getenv("REDIS_PW"),
-		DB: 		int(db),
+		Addr:       os.Getenv("REDIS_ADDR"),
+		Password:   os.Getenv("REDIS_PW"),
+		DB:         int(db),
 		MaxRetries: 1,
 	})
 

@@ -3,15 +3,15 @@ package model
 import "golang.org/x/crypto/bcrypt"
 
 type User struct {
-	ID			uint `gorm:"primaryKey"`
-	Username	string
-	Password	string
-	Nickname	string
-	Avatar		string `gorm:"size:1000"`
+	ID       uint `gorm:"primaryKey"`
+	Username string
+	Password string
+	Nickname string
+	Avatar   string `gorm:"size:1000"`
 }
 
 type LoginUser struct {
-	User User
+	User  User
 	Token string
 }
 
