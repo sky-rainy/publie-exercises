@@ -1,0 +1,3 @@
+[submodule "web/publie-exercises-web"]
+	path = web/publie-exercises-web
+	url = https://github.com/sky-rainy/publie-exercises-web
