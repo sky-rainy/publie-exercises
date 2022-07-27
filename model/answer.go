@@ -1,10 +1,8 @@
 package model
 
-import "gorm.io/gorm"
-
 // Answer 答案表
 type Answer struct {
-	gorm.Model
+	BaseModel
 	Content    string `gorm:"comment:答案内容"`
 	Img        string `gorm:"comment:答案图片内容"`
 	AnswerType uint   `gorm:"size:7; default:0; comment:答案类型默认0选择2内容+图片3图片;"`
