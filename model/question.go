@@ -8,7 +8,7 @@ type Question struct {
 	Qimg       string `gorm:"column:q_img; size:500; comment:题目图片内容"`
 	Qtype      uint   `gorm:"column:q_type; size:7; default:0; comment:题目类型;"`
 	Status     uint   `gorm:"column:status; size:7; default:0; comment:题目状态;"`
-	Sort       uint   `gorm:"column:sort; size:7; comment:排序"`
+	Sort       uint   `gorm:"column:sort; size:7; default:0; comment:排序;"`
 	Delete     uint   `gorm:"column:delete; size:7; default:0; comment:题目删除状态;"`
 	CreateTime int    `gorm:"column:create_time; comment:创建时间;"`
 	V1         string `gorm:"column:v1; size:500; comment:选择题1"`

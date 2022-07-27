@@ -7,5 +7,5 @@ type Answer struct {
 	Aimg    string `gorm:"column:a_img; comment:答案图片内容"`
 	Atype   uint   `gorm:"column:a_type; size:2; default:0; comment:答案类型默认0选择2内容+图片3图片;"`
 	QID     uint   `gorm:"column:q_id; index; comment:题目ID"`
-	Sort    uint   `gorm:"column:sort; size:7; comment:排序"`
+	Sort    uint   `gorm:"column:sort; size:7; default:0; comment:排序"`
 }
