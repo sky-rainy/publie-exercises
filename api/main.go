@@ -27,7 +27,8 @@ func Delete_All(c *gin.Context) {
 }
 
 func Query(c *gin.Context) {
-	if data, err := fts.Query("123"); err == nil {
+	query := c.DefaultQuery("query", "")
+	if data, err := fts.Query(query); err == nil {
 		// println(data)
 		c.JSON(http.StatusOK, serializer.Response{
 			Code: http.StatusOK,

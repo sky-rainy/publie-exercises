@@ -97,7 +97,6 @@ pub async fn run(mut rx: mpsc::UnboundedReceiver<TantivyAction>) -> bool {
                                         .map(|(score, doc_address)| {
                                             let doc = searcher.doc(doc_address).unwrap();
                                             let snippet = snippet_generator.snippet_from_doc(&doc);
-                                            log::info!("doc {doc:?} {:?}", doc.get_first(*id_filed));
                                             QueryResult {
                                                 // unwarp可用
                                                 id: doc
