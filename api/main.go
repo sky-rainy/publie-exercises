@@ -12,8 +12,7 @@ func Ping(c *gin.Context) {
 	c.JSON(200, serializer.Response{Code: 0, Message: "Pong"})
 }
 func Delete_All(c *gin.Context) {
-	data, err := fts.DeleteAll()
-	if err == nil {
+	if data, err := fts.DeleteAll(); err == nil {
 		// println(data)
 		c.JSON(http.StatusOK, serializer.Response{
 			Code: http.StatusOK,
@@ -28,8 +27,7 @@ func Delete_All(c *gin.Context) {
 }
 
 func Query(c *gin.Context) {
-	data, err := fts.Query("123")
-	if err == nil {
+	if data, err := fts.Query("123"); err == nil {
 		// println(data)
 		c.JSON(http.StatusOK, serializer.Response{
 			Code: http.StatusOK,
@@ -44,15 +42,14 @@ func Query(c *gin.Context) {
 }
 
 type TContents struct {
-	Contents []fts.Contents `json:"contents"`
+	Contents []fts.Contents `json:"contents" binding:"required"`
 }
 
 func BatchAdd(c *gin.Context) {
 	var contents TContents
-	if err := c.ShouldBind(&contents); err == nil {
+	if err := c.ShouldBindJSON(&contents); err == nil {
 		data, err := fts.BatchAdd(contents.Contents)
 		if err == nil {
-			// println(data)
 			c.JSON(http.StatusOK, serializer.Response{
 				Code: http.StatusOK,
 				Data: data,

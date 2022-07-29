@@ -25,7 +25,7 @@ func NewRouter() *gin.Engine {
 		}
 		v1.GET("/delete_all", api.Delete_All)
 		v1.GET("/query", api.Query)
-		v1.GET("/batch_add", api.BatchAdd)
+		v1.POST("/batch_add", api.BatchAdd)
 	}
 	return r
 }

@@ -34,9 +34,9 @@ type QueryResult struct {
 
 // 内容搜索
 type Contents struct {
-	Id       uint64   `json:"id"`
-	Title    string   `json:"title"`
-	Contents []string `json:"contents"`
+	Id       uint64   `json:"id" binding:"required"`
+	Title    string   `json:"title" binding:"required"`
+	Contents []string `json:"contents" binding:"required"`
 }
 
 func DeleteAll() (ActionResult, error) {

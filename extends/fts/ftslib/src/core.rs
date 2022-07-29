@@ -97,6 +97,7 @@ pub async fn run(mut rx: mpsc::UnboundedReceiver<TantivyAction>) -> bool {
                                         .map(|(score, doc_address)| {
                                             let doc = searcher.doc(doc_address).unwrap();
                                             let snippet = snippet_generator.snippet_from_doc(&doc);
+                                            log::info!("doc {doc:?} {:?}", doc.get_first(*id_filed));
                                             QueryResult {
                                                 // unwarp可用
                                                 id: doc
@@ -125,6 +126,7 @@ pub async fn run(mut rx: mpsc::UnboundedReceiver<TantivyAction>) -> bool {
                                 }
                             });
                         }
+                        // 由于有文档索引，所以不需要Update函数，直接batch_add就行了，会自动删除文档索引对应得文档的
                         TantivyActionType::Update(c) => {
                             tokio::task::spawn(async move {
                                 // 新增文档
@@ -385,7 +387,7 @@ pub fn tantivy_init() -> tantivy::Result<TantivyConfig> {
     // add_text_field
     schema_builder.add_text_field("title", text_options.clone());
     schema_builder.add_text_field("body", text_options);
-    schema_builder.add_u64_field("index", INDEXED);
+    schema_builder.add_u64_field("index", INDEXED | STORED);
     // 创建
     let schema = schema_builder.build();
     // 初始化索引器 创建或者重用
