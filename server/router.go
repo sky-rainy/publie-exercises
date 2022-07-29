@@ -1,9 +1,10 @@
 package server
 
 import (
-	"github.com/gin-gonic/gin"
 	"gollow/api"
 	"gollow/middleware"
+
+	"github.com/gin-gonic/gin"
 )
 
 func NewRouter() *gin.Engine {
@@ -13,7 +14,7 @@ func NewRouter() *gin.Engine {
 	r.Use(middleware.Cors())
 
 	// 路由
-	v1 :=r.Group("/api/v1")
+	v1 := r.Group("/api/v1")
 	{
 		v1.POST("/ping", api.Ping)
 
@@ -22,6 +23,9 @@ func NewRouter() *gin.Engine {
 			user.POST("/login", api.Login)
 			user.POST("/register", api.Register)
 		}
+		v1.GET("/delete_all", api.Delete_All)
+		v1.GET("/query", api.Query)
+		v1.GET("/batch_add", api.BatchAdd)
 	}
 	return r
 }

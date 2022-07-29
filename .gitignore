@@ -2,3 +2,6 @@
 package-lock.json
 .idea
 .env
+go_run.exe
+log/
+index/
