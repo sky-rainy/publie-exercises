@@ -3,11 +3,11 @@ use tantivy::{IndexReader, IndexWriter};
 
 use tantivy::collector::TopDocs;
 use tantivy::query::{QueryParser, TermQuery};
-use tantivy::{schema::*, Snippet, SnippetGenerator};
+use tantivy::{schema::*, SnippetGenerator};
 use tantivy::{Index, ReloadPolicy};
 use tokio::sync::{mpsc, RwLock};
 
-use crate::message::{QueryResult, TantivyAction, TantivyActionResult, TantivyActionType};
+use crate::message::{ActionResult, QueryResultItem, TantivyAction, TantivyActionType};
 // 根据id查询返回doc
 fn extract_doc_given_id(reader: &IndexReader, id_term: &Term) -> tantivy::Result<Option<Document>> {
     let searcher = reader.searcher();
@@ -44,10 +44,10 @@ pub async fn run(mut rx: mpsc::UnboundedReceiver<TantivyAction>) -> bool {
                         TantivyActionType::Query(q) => {
                             tokio::task::spawn(async move {
                                 if q.trim().is_empty() {
-                                    if let Err(err) = action.sender.send(TantivyActionResult {
+                                    if let Err(err) = action.sender.send(ActionResult {
                                         success: false,
                                         err: Some("构建查询条件失败 空字符".to_string()),
-                                        result: None,
+                                        result: Vec::new(),
                                     }) {
                                         log::error!("信息发送失败{err:?}")
                                     }
@@ -60,13 +60,11 @@ pub async fn run(mut rx: mpsc::UnboundedReceiver<TantivyAction>) -> bool {
                                     let query = match query_parser.parse_query(&q) {
                                         Ok(v) => v,
                                         Err(e) => {
-                                            if let Err(err) =
-                                                action.sender.send(TantivyActionResult {
-                                                    success: false,
-                                                    err: Some(format!("构建查询条件失败{e:?}")),
-                                                    result: None,
-                                                })
-                                            {
+                                            if let Err(err) = action.sender.send(ActionResult {
+                                                success: false,
+                                                err: Some(format!("构建查询条件失败{e:?}")),
+                                                result: Vec::new(),
+                                            }) {
                                                 log::error!("信息发送失败{err:?}")
                                             }
                                             return;
@@ -76,13 +74,11 @@ pub async fn run(mut rx: mpsc::UnboundedReceiver<TantivyAction>) -> bool {
                                         match searcher.search(&query, &TopDocs::with_limit(10)) {
                                             Ok(v) => v,
                                             Err(e) => {
-                                                if let Err(err) =
-                                                    action.sender.send(TantivyActionResult {
-                                                        success: false,
-                                                        err: Some(format!("查询失败{e:?}")),
-                                                        result: None,
-                                                    })
-                                                {
+                                                if let Err(err) = action.sender.send(ActionResult {
+                                                    success: false,
+                                                    err: Some(format!("查询失败{e:?}")),
+                                                    result: Vec::new(),
+                                                }) {
                                                     log::error!("信息发送失败{err:?}")
                                                 }
                                                 return;
@@ -92,12 +88,12 @@ pub async fn run(mut rx: mpsc::UnboundedReceiver<TantivyAction>) -> bool {
                                     let snippet_generator =
                                         SnippetGenerator::create(&searcher, &*query, *body_filed)
                                             .unwrap();
-                                    let r: Vec<QueryResult> = top_docs
+                                    let r: Vec<QueryResultItem> = top_docs
                                         .into_iter()
                                         .map(|(score, doc_address)| {
                                             let doc = searcher.doc(doc_address).unwrap();
                                             let snippet = snippet_generator.snippet_from_doc(&doc);
-                                            QueryResult {
+                                            QueryResultItem {
                                                 // unwarp可用
                                                 id: doc
                                                     .get_first(*id_filed)
@@ -110,15 +106,15 @@ pub async fn run(mut rx: mpsc::UnboundedReceiver<TantivyAction>) -> bool {
                                                     .as_text()
                                                     .unwrap()
                                                     .to_string(),
-                                                contents: snippet.to_html(),
+                                                data: snippet.to_html(),
                                                 score,
                                             }
                                         })
                                         .collect();
-                                    if let Err(err) = action.sender.send(TantivyActionResult {
+                                    if let Err(err) = action.sender.send(ActionResult {
                                         success: true,
                                         err: None,
-                                        result: Some(r),
+                                        result: r,
                                     }) {
                                         log::error!("信息发送失败{err:?}")
                                     }
@@ -132,7 +128,7 @@ pub async fn run(mut rx: mpsc::UnboundedReceiver<TantivyAction>) -> bool {
                                 let mut doc_new = Document::default();
                                 doc_new.add_text(*title_filed, c.title);
                                 doc_new.add_u64(*id_filed, c.id);
-                                c.contents.iter().for_each(|i| {
+                                c.body.iter().for_each(|i| {
                                     doc_new.add_text(*body_filed, i);
                                 });
                                 let frankenstein_id = Term::from_field_u64(*id_filed, c.id);
@@ -153,7 +149,7 @@ pub async fn run(mut rx: mpsc::UnboundedReceiver<TantivyAction>) -> bool {
                                             lock_config_index_writer.add_document(doc_new),
                                             lock_config_index_writer.commit(),
                                         ) {
-                                            (Ok(_), Ok(_)) => TantivyActionResult {
+                                            (Ok(_), Ok(_)) => ActionResult {
                                                 success: true,
                                                 ..Default::default()
                                             },
@@ -166,7 +162,7 @@ pub async fn run(mut rx: mpsc::UnboundedReceiver<TantivyAction>) -> bool {
                                                         rollback_r.err()
                                                     );
                                                 }
-                                                TantivyActionResult {
+                                                ActionResult {
                                                     success: false,
                                                     err: Some(format!("{e:?}")),
                                                     ..Default::default()
@@ -181,7 +177,7 @@ pub async fn run(mut rx: mpsc::UnboundedReceiver<TantivyAction>) -> bool {
                                                         rollback_r.err()
                                                     );
                                                 };
-                                                TantivyActionResult {
+                                                ActionResult {
                                                     success: false,
                                                     err: Some(format!("{e:?}; {r:?}")),
                                                     ..Default::default()
@@ -193,10 +189,10 @@ pub async fn run(mut rx: mpsc::UnboundedReceiver<TantivyAction>) -> bool {
                                     }
                                     Err(e) => {
                                         log::error!("Tantivy查询失败{e:?}");
-                                        TantivyActionResult {
+                                        ActionResult {
                                             success: false,
                                             err: Some(format!("{e:?}")),
-                                            result: None,
+                                            result: Vec::new(),
                                         }
                                     }
                                 };
@@ -215,7 +211,7 @@ pub async fn run(mut rx: mpsc::UnboundedReceiver<TantivyAction>) -> bool {
                                 );
                                 let r = match frankenstein_doc_misspelled {
                                     Ok(doc) => {
-                                        let mut r = TantivyActionResult {
+                                        let mut r = ActionResult {
                                             success: true,
                                             ..Default::default()
                                         };
@@ -241,10 +237,10 @@ pub async fn run(mut rx: mpsc::UnboundedReceiver<TantivyAction>) -> bool {
                                     }
                                     Err(e) => {
                                         log::error!("Tantivy查询失败{e:?}");
-                                        TantivyActionResult {
+                                        ActionResult {
                                             success: false,
                                             err: Some(format!("{e:?}")),
-                                            result: None,
+                                            result: Vec::new(),
                                         }
                                     }
                                 };
@@ -263,7 +259,7 @@ pub async fn run(mut rx: mpsc::UnboundedReceiver<TantivyAction>) -> bool {
                                 // 获取reader读锁
                                 let lock_config_reader = config_reader.read().await;
                                 // lock_config_index_writer.rollback();
-                                let mut r = TantivyActionResult {
+                                let mut r = ActionResult {
                                     success: true,
                                     ..Default::default()
                                 };
@@ -272,7 +268,7 @@ pub async fn run(mut rx: mpsc::UnboundedReceiver<TantivyAction>) -> bool {
                                     let mut doc_new = Document::default();
                                     doc_new.add_text(*title_filed, c.title);
                                     doc_new.add_u64(*id_filed, c.id);
-                                    c.contents.iter().for_each(|i| {
+                                    c.body.iter().for_each(|i| {
                                         doc_new.add_text(*body_filed, i);
                                     });
                                     let frankenstein_id = Term::from_field_u64(*id_filed, c.id);
@@ -290,7 +286,7 @@ pub async fn run(mut rx: mpsc::UnboundedReceiver<TantivyAction>) -> bool {
                                             match lock_config_index_writer.add_document(doc_new) {
                                                 Ok(_) => continue,
                                                 Err(e) => {
-                                                    r = TantivyActionResult {
+                                                    r = ActionResult {
                                                         success: false,
                                                         err: Some(format!("{e:?}")),
                                                         ..Default::default()
@@ -302,10 +298,10 @@ pub async fn run(mut rx: mpsc::UnboundedReceiver<TantivyAction>) -> bool {
                                         }
                                         Err(e) => {
                                             log::error!("Tantivy查询失败{e:?}");
-                                            r = TantivyActionResult {
+                                            r = ActionResult {
                                                 success: false,
                                                 err: Some(format!("{e:?}")),
-                                                result: None,
+                                                result: Vec::new(),
                                             };
                                             break;
                                         }
@@ -326,10 +322,10 @@ pub async fn run(mut rx: mpsc::UnboundedReceiver<TantivyAction>) -> bool {
                             });
                         }
                         TantivyActionType::DeleteAll => {
-                            let mut r = TantivyActionResult {
+                            let mut r = ActionResult {
                                 success: true,
                                 err: None,
-                                result: None,
+                                result: Vec::new(),
                             };
                             // 获取读写锁
                             {
@@ -420,18 +416,18 @@ pub fn tantivy_init() -> tantivy::Result<TantivyConfig> {
 }
 
 // format方式
-fn highlight(snippet: Snippet) -> String {
-    let mut result = String::new();
-    let mut start_from = 0;
+// fn highlight(snippet: Snippet) -> String {
+//     let mut result = String::new();
+//     let mut start_from = 0;
 
-    for fragment_range in snippet.highlighted() {
-        result.push_str(&snippet.fragment()[start_from..fragment_range.start]);
-        result.push_str(" --> ");
-        result.push_str(&snippet.fragment()[fragment_range.clone()]);
-        result.push_str(" <-- ");
-        start_from = fragment_range.end;
-    }
+//     for fragment_range in snippet.highlighted() {
+//         result.push_str(&snippet.fragment()[start_from..fragment_range.start]);
+//         result.push_str(" --> ");
+//         result.push_str(&snippet.fragment()[fragment_range.clone()]);
+//         result.push_str(" <-- ");
+//         start_from = fragment_range.end;
+//     }
 
-    result.push_str(&snippet.fragment()[start_from..]);
-    result
-}
+//     result.push_str(&snippet.fragment()[start_from..]);
+//     result
+// }

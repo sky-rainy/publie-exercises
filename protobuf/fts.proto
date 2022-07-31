@@ -1,0 +1,29 @@
+
+// 这是protobuf的版本
+syntax = "proto3";
+
+//定义包名
+package fts;
+option go_package = "extends/fts";
+// 定义数据结构，message 类似golang中的struct
+message ActionResult {
+  optional string err = 1;   // 错误信息
+  bool success = 2;   // 是否成功
+  repeated  QueryResultItem result = 3; // 查询结果
+}
+message QueryResultItem {
+  uint64 id = 1;   // 文档id
+  string title = 2;   // 文档标题
+  string data = 3;   // 文档关联的查询内容
+  float score = 4; // 得分
+}
+
+message Contents {
+  uint64 id = 1;   // 文档id
+  string title = 2;   // 文档标题
+  repeated string body = 3;   // 内容
+}
+
+message BatchContents {
+  repeated Contents contents = 1;   // 内容
+}

@@ -1,12 +1,12 @@
-use std::ffi::{CStr, CString};
+use std::ffi::CStr;
 mod core;
+mod fts;
 mod message;
 mod mlog;
 
 use anyhow::Result;
-use message::{TantivyAction, TantivyActionResult, TantivyActionType};
-// use message::Contents;
-// use serde::{Deserialize, Serialize};
+use message::{ActionResult, BatchContents, Contents, TantivyAction, TantivyActionType};
+use prost::Message;
 use tokio::sync::{mpsc, oneshot, RwLock};
 
 // fts是否已经初始化
@@ -15,6 +15,13 @@ lazy_static::lazy_static! {
    static ref ACTION_SENDER: RwLock<Option<mpsc::UnboundedSender<TantivyAction>>> = RwLock::new(None);
    static ref TOKIO_RUNTIME: tokio::runtime::Runtime = tokio::runtime::Runtime::new().unwrap();
 }
+
+#[repr(C)]
+pub struct Buffer {
+    pub data: *mut u8,
+    pub len: u64,
+}
+
 // 初始化运行时 0 失败 1 成功
 #[no_mangle]
 pub extern "C" fn init_fts() -> libc::c_int {
@@ -33,84 +40,113 @@ pub extern "C" fn init_fts() -> libc::c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn delete_all() -> *const libc::c_char {
+pub extern "C" fn delete_all() -> Buffer {
     let r = match task_action(TantivyActionType::DeleteAll) {
         Ok(v) => v,
-        Err(e) => TantivyActionResult {
+        Err(e) => ActionResult {
             success: false,
             err: Some(e.to_string()),
-            result: None,
+            result: Vec::new(),
         },
     };
-    let r_str = serde_json::to_string(&r).unwrap();
-    CString::new(r_str).unwrap().into_raw()
+    let mut r_vec = r.encode_to_vec();
+    let data = r_vec.as_mut_ptr();
+    let len = r_vec.len() as u64;
+    std::mem::forget(r_vec);
+    Buffer { data, len  }
 }
-
 #[no_mangle]
-pub extern "C" fn query(query: *const libc::c_char) -> *const libc::c_char {
-    let cstr_query = unsafe { CStr::from_ptr(query) };
-    let str_query = cstr_query.to_str().unwrap().to_string();
+pub  extern "C" fn query(query: *const libc::c_char) -> Buffer {
+    let str_query = unsafe {
+        CStr::from_ptr(query).to_str().unwrap().to_string()
+    };
     let r = match task_action(TantivyActionType::Query(str_query)) {
         Ok(v) => v,
-        Err(e) => TantivyActionResult {
+        Err(e) => ActionResult {
             success: false,
             err: Some(e.to_string()),
-            result: None,
+            result: Vec::new(),
         },
     };
-    let r_str = serde_json::to_string(&r).unwrap();
-    CString::new(r_str).unwrap().into_raw()
+    let mut r_vec = r.encode_to_vec();
+
+    let data = r_vec.as_mut_ptr();
+    let len = r_vec.len() as u64;
+    std::mem::forget(r_vec);
+    Buffer { data, len }
+}
+
+
+
+#[no_mangle]
+pub extern "C" fn update(content_buf: Buffer) -> Buffer {
+    let content_body = unsafe { std::slice::from_raw_parts_mut(content_buf.data, content_buf.len as usize) };
+    let r = match Contents::decode(&*content_body) {
+        Ok(v) => match task_action(TantivyActionType::Update(v)) {
+            Ok(v) => v,
+            Err(e) => ActionResult {
+                success: false,
+                err: Some(e.to_string()),
+                result: Vec::new(),
+            },
+        },
+        Err(e) => ActionResult {
+            success: false,
+            err: Some(e.to_string()),
+            result: Vec::new(),
+        },
+    };
+    let mut r_vec = r.encode_to_vec();
+    let data = r_vec.as_mut_ptr();
+    let len = r_vec.len() as u64;
+    std::mem::forget(r_vec);
+    Buffer { data, len }
 }
 
 #[no_mangle]
-pub extern "C" fn update(content: *const libc::c_char) -> *const libc::c_char {
-    let cstr_query = unsafe { CStr::from_ptr(content) };
-    let str_content = cstr_query.to_str().unwrap();
-    let contents = serde_json::from_str(str_content).unwrap();
-    let r = match task_action(TantivyActionType::Update(contents)) {
-        Ok(v) => v,
-        Err(e) => TantivyActionResult {
-            success: false,
-            err: Some(e.to_string()),
-            result: None,
-        },
-    };
-    let r_str = serde_json::to_string(&r).unwrap();
-    CString::new(r_str).unwrap().into_raw()
-}
-
-#[no_mangle]
-pub extern "C" fn delete_by_id(id: libc::c_ulonglong) -> *const libc::c_char {
+pub extern "C" fn delete_by_id(id: libc::c_ulonglong) -> Buffer {
     let r = match task_action(TantivyActionType::Delete(id)) {
         Ok(v) => v,
-        Err(e) => TantivyActionResult {
+        Err(e) => ActionResult {
             success: false,
             err: Some(e.to_string()),
-            result: None,
+            result: Vec::new(),
         },
     };
-    let r_str = serde_json::to_string(&r).unwrap();
-    CString::new(r_str).unwrap().into_raw()
+    let mut r_vec = r.encode_to_vec();
+
+    let data = r_vec.as_mut_ptr();
+    let len = r_vec.len() as u64;
+    std::mem::forget(r_vec);
+    Buffer { data, len }
 }
 #[no_mangle]
-pub extern "C" fn batch_add(contents: *const libc::c_char) -> *const libc::c_char {
-    let cstr_query = unsafe { CStr::from_ptr(contents) };
-    let str_contents = cstr_query.to_str().unwrap();
-    let v_contents = serde_json::from_str(str_contents).unwrap();
-    let r = match task_action(TantivyActionType::BatchAdd(v_contents)) {
-        Ok(v) => v,
-        Err(e) => TantivyActionResult {
+pub extern "C" fn batch_add(content_buf: Buffer) -> Buffer {
+    let content_body = unsafe { std::slice::from_raw_parts(content_buf.data, content_buf.len as usize) };
+    let r = match BatchContents::decode(&*content_body) {
+        Ok(v) => match task_action(TantivyActionType::BatchAdd(v.contents)) {
+            Ok(v) => v,
+            Err(e) => ActionResult {
+                success: false,
+                err: Some(e.to_string()),
+                result: Vec::new(),
+            },
+        },
+        Err(e) => ActionResult {
             success: false,
             err: Some(e.to_string()),
-            result: None,
+            result: Vec::new(),
         },
     };
-    let r_str = serde_json::to_string(&r).unwrap();
-    CString::new(r_str).unwrap().into_raw()
+    let mut r_vec = r.encode_to_vec();
+    let data = r_vec.as_mut_ptr();
+    let len = r_vec.len() as u64;
+    std::mem::forget(r_vec);
+    Buffer { data, len }
 }
 
 // 执行task
-fn task_action(action_type: TantivyActionType) -> Result<TantivyActionResult> {
+fn task_action(action_type: TantivyActionType) -> Result<ActionResult> {
     unsafe {
         if !INIT_FTS {
             return Err(anyhow::format_err!("未初始化runtime"));
@@ -140,8 +176,10 @@ fn task_action(action_type: TantivyActionType) -> Result<TantivyActionResult> {
 }
 
 #[no_mangle]
-pub extern "C" fn free_cstring(s: *mut libc::c_char) {
+pub extern "C" fn free_bytes(buf: Buffer) {
+    let s = unsafe { std::slice::from_raw_parts_mut(buf.data, buf.len as usize) };
+    let s = s.as_mut_ptr();
     unsafe {
-        let _ = CString::from_raw(s);
+        Box::from_raw(s);
     }
 }

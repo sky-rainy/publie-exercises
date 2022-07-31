@@ -17,6 +17,7 @@ require (
 	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa
 	golang.org/x/net v0.0.0-20220726230323-06994584191e // indirect
 	golang.org/x/sys v0.0.0-20220727055044-e65921a090b8 // indirect
+	google.golang.org/protobuf v1.28.0
 	gorm.io/driver/mysql v1.3.5
 	gorm.io/gorm v1.23.8
 )

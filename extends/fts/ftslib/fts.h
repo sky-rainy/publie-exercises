@@ -3,16 +3,21 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+typedef struct Buffer {
+  uint8_t *data;
+  uint64_t len;
+} Buffer;
+
 int init_fts(void);
 
-const char *delete_all(void);
+struct Buffer delete_all(void);
 
-const char *query(const char *query);
+struct Buffer query(const char *query);
 
-const char *update(const char *content);
+struct Buffer update(struct Buffer content_buf);
 
-const char *delete_by_id(unsigned long long id);
+struct Buffer delete_by_id(unsigned long long id);
 
-const char *batch_add(const char *contents);
+struct Buffer batch_add(struct Buffer content_buf);
 
-void free_cstring(char *s);
+void free_bytes(struct Buffer buf);

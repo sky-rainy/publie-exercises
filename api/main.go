@@ -43,7 +43,7 @@ func Query(c *gin.Context) {
 }
 
 type TContents struct {
-	Contents []fts.Contents `json:"contents" binding:"required"`
+	Contents []*fts.Contents `json:"contents" binding:"required"`
 }
 
 func BatchAdd(c *gin.Context) {
